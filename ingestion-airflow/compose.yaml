@@ -1,0 +1,49 @@
+name: otc-ingestion
+
+services:
+  airflow:
+    build: .
+    command: standalone
+    depends_on:
+      bronze:
+        condition: service_healthy
+    env_file:
+      - platform.env
+    environment:
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/otc/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/airflow-passwords.json
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin"
+      BRONZE_S3_ENDPOINT: http://bronze:9000
+    ports:
+      - "127.0.0.1:18081:8080"
+    volumes:
+      - airflow-home:/opt/airflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/v2/monitor/health', timeout=5)"]
+      interval: 10s
+      timeout: 8s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  bronze:
+    build: ./minio
+    environment:
+      MINIO_ROOT_USER: ${BRONZE_S3_ACCESS_KEY:?Set BRONZE_S3_ACCESS_KEY in platform.env}
+      MINIO_ROOT_PASSWORD: ${BRONZE_S3_SECRET_KEY:?Set BRONZE_S3_SECRET_KEY in platform.env}
+    ports:
+      - "127.0.0.1:19001:9001"
+    volumes:
+      - bronze-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  airflow-home:
+  bronze-data:

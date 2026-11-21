@@ -1,0 +1,282 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otc-erp
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-data
+  namespace: otc-erp
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: erpnext-sites
+  namespace: otc-erp
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: otc-erp
+spec:
+  type: ClusterIP
+  selector:
+    app: mariadb
+  ports:
+  - port: 3306
+    targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: otc-erp
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: &id001
+      app: mariadb
+  template:
+    metadata:
+      labels: *id001
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: mariadb
+        image: mariadb:11.8
+        args:
+        - --character-set-server=utf8mb4
+        - --collation-server=utf8mb4_unicode_ci
+        - --skip-character-set-client-handshake
+        - --innodb-snapshot-isolation=OFF
+        env:
+        - name: MARIADB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: erpnext-bootstrap
+              key: db-root-password
+        readinessProbe:
+          exec:
+            command:
+            - healthcheck.sh
+            - --connect
+            - --innodb_initialized
+          periodSeconds: 5
+        volumeMounts:
+        - name: mariadb-data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mariadb-data
+        persistentVolumeClaim:
+          claimName: mariadb-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: otc-erp
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: cache
+  - port: 6380
+    targetPort: 6380
+    name: queue
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: otc-erp
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: &id001
+      app: redis
+  template:
+    metadata:
+      labels: *id001
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: cache
+        image: redis:6.2-alpine
+      - name: queue
+        image: redis:6.2-alpine
+        args:
+        - redis-server
+        - --port
+        - '6380'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: erpnext
+  namespace: otc-erp
+spec:
+  type: ClusterIP
+  selector:
+    app: erpnext
+  ports:
+  - port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erpnext
+  namespace: otc-erp
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: &id001
+      app: erpnext
+  template:
+    metadata:
+      labels: *id001
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: backend
+        image: otc-erpnext-bootstrap:v16.60.0
+        imagePullPolicy: Never
+        workingDir: /home/frappe/frappe-bench
+        volumeMounts:
+        - name: erpnext-sites
+          mountPath: /home/frappe/frappe-bench/sites
+      - name: frontend
+        image: otc-erpnext-bootstrap:v16.60.0
+        imagePullPolicy: Never
+        workingDir: /home/frappe/frappe-bench
+        volumeMounts:
+        - name: erpnext-sites
+          mountPath: /home/frappe/frappe-bench/sites
+        command:
+        - nginx-entrypoint.sh
+        env:
+        - name: BACKEND
+          value: 127.0.0.1:8000
+        - name: SOCKETIO
+          value: 127.0.0.1:9000
+        - name: FRAPPE_SITE_NAME_HEADER
+          value: frontend
+        - name: UPSTREAM_REAL_IP_ADDRESS
+          value: 127.0.0.1
+        - name: UPSTREAM_REAL_IP_HEADER
+          value: X-Forwarded-For
+        - name: UPSTREAM_REAL_IP_RECURSIVE
+          value: 'off'
+        - name: PROXY_READ_TIMEOUT
+          value: '120'
+        - name: CLIENT_MAX_BODY_SIZE
+          value: 50m
+        readinessProbe:
+          httpGet:
+            path: /api/method/ping
+            port: 8080
+          periodSeconds: 5
+      - name: websocket
+        image: otc-erpnext-bootstrap:v16.60.0
+        imagePullPolicy: Never
+        workingDir: /home/frappe/frappe-bench
+        volumeMounts:
+        - name: erpnext-sites
+          mountPath: /home/frappe/frappe-bench/sites
+        command:
+        - node
+        - /home/frappe/frappe-bench/apps/frappe/socketio.js
+      - name: worker
+        image: otc-erpnext-bootstrap:v16.60.0
+        imagePullPolicy: Never
+        workingDir: /home/frappe/frappe-bench
+        volumeMounts:
+        - name: erpnext-sites
+          mountPath: /home/frappe/frappe-bench/sites
+        command:
+        - bench
+        - worker
+        - --queue
+        - long,default,short
+      - name: scheduler
+        image: otc-erpnext-bootstrap:v16.60.0
+        imagePullPolicy: Never
+        workingDir: /home/frappe/frappe-bench
+        volumeMounts:
+        - name: erpnext-sites
+          mountPath: /home/frappe/frappe-bench/sites
+        command:
+        - bench
+        - schedule
+      securityContext:
+        fsGroup: 1000
+      volumes:
+      - name: erpnext-sites
+        persistentVolumeClaim:
+          claimName: erpnext-sites
+      initContainers:
+      - name: initialize-site
+        image: otc-erpnext-bootstrap:v16.60.0
+        imagePullPolicy: Never
+        workingDir: /home/frappe/frappe-bench
+        volumeMounts:
+        - name: erpnext-sites
+          mountPath: /home/frappe/frappe-bench/sites
+        command:
+        - bash
+        - -ec
+        args:
+        - |
+          wait-for-it -t 120 -s mariadb:3306
+          wait-for-it -t 120 -s redis:6379
+          wait-for-it -t 120 -s redis:6380
+          cp -R -P -n /tmp/erpnext-sites-template/. sites/
+          ls -1 apps > sites/apps.txt
+          bench set-config -g db_host mariadb
+          bench set-config -gp db_port 3306
+          bench set-config -g redis_cache redis://redis:6379
+          bench set-config -g redis_queue redis://redis:6380
+          bench set-config -g redis_socketio redis://redis:6380
+          bench set-config -gp socketio_port 9000
+          if [ ! -f sites/frontend/site_config.json ]; then
+            bench new-site --mariadb-user-host-login-scope='%' \
+              --db-root-username root --db-root-password "$DB_ROOT_PASSWORD" \
+              --admin-password "$ADMIN_PASSWORD" --install-app erpnext --set-default frontend
+          fi
+          installed_apps="$(bench --site frontend list-apps)"
+          printf '%s\n' "$installed_apps"
+          printf '%s\n' "$installed_apps" | grep -Eq '^[[:space:]]*erpnext([[:space:]]|$)'
+        env:
+        - name: DB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: erpnext-bootstrap
+              key: db-root-password
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: erpnext-bootstrap
+              key: admin-password

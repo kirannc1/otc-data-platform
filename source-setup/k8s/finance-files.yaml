@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: finance-files
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      containers:
+      - name: finance-files
+        image: otc-finance-files:0.1.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: S3_ENDPOINT
+          value: http://minio:9000
+        - name: INBOUND_BUCKET
+          value: otc-inbound
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: source-credentials
+              key: MINIO_ROOT_USER
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: source-credentials
+              key: MINIO_ROOT_PASSWORD

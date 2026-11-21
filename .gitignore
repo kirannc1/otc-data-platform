@@ -1,0 +1,7 @@
+k8s/*.env
+__pycache__/
+*.pyc
+seed/*.env
+erp-seed-receipt.json
+~
+.venv

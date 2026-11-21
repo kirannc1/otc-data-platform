@@ -1,0 +1,17 @@
+{
+  "snapshots": {
+    "erpnext": "batch/erpnext/manual__2026-11-21T13%3A02%3A58.531060%2B00%3A00/manifest.json",
+    "parent-pos": "batch/parent-pos/manual__2026-11-21T13%3A02%3A58.531060%2B00%3A00/manifest.json",
+    "dealer-sql": "batch/dealer-sql/manual__2026-11-21T13%3A03%3A28.292956%2B00%3A00/manifest.json"
+  },
+  "dealer_export": "files/otc-inbound/dealer/exports/dealer-export-20261121165650493/9dc745b7a550acffd31fb32c21a4a89b724ce259c274a047a6de03e9e90f4a47/manifest.json",
+  "file_manifests": [
+    "files/otc-inbound/dealer/exports/dealer-export-20261121165650493/9dc745b7a550acffd31fb32c21a4a89b724ce259c274a047a6de03e9e90f4a47/manifest.json",
+    "files/otc-inbound/dealer/finance/dealer-order-v1/534872ac4271c54bc3d67486a98870e3ecdd3ea11e072433f0e8103ba40b38b6/manifest.json",
+    "files/otc-inbound/parent/finance/dealer-order-v1/252affa23ce2581d7c15a8f8ac6082214d235e07a60db4e48607793577a15878/manifest.json",
+    "files/otc-inbound/seed-v1/8fab9f89f5242c6819f2ea008f6ddba83b9de4370232084fba58917dec72de4e/manifest.json"
+  ],
+  "kafka_objects": [
+    "kafka/parent.orders.v1/generation=v1/partition=0/offset=0.json"
+  ]
+}

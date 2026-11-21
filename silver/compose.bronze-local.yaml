@@ -1,0 +1,4 @@
+services:
+  bronze:
+    ports:
+      - "127.0.0.1:19000:9000"

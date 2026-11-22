@@ -1,0 +1,19 @@
+{
+  "dealer_currency": "INR",
+  "mdm_effective_from": "2026-11-01",
+  "ar_cutoff": "2026-12-10",
+  "validate_fixture_baseline": true,
+  "manifests": {
+    "erpnext": null,
+    "dealer-sql": null,
+    "parent-pos": null,
+    "dealer_export": null,
+    "parent_finance": null,
+    "dealer_finance": null,
+    "mdm": null
+  },
+  "kafka_keys": null,
+  "mdm_steward_decisions": {},
+  "seal_conversion": null,
+  "bank_accounts": {}
+}

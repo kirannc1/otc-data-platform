@@ -5,3 +5,4 @@ seed/*.env
 erp-seed-receipt.json
 ~
 .venv
+silver/silver_output/

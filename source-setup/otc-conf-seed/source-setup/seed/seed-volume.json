@@ -1,0 +1,24 @@
+{
+  "batch_id": "VOL001",
+  "posting_date": "2026-11-21",
+  "ar_cutoff": "2026-12-16",
+  "parent": {
+    "bookings": 100,
+    "shipments": 120,
+    "invoices": 80,
+    "payments": 40,
+    "pos_receipts": 30
+  },
+  "dealer": {
+    "bookings": 60,
+    "shipments": 50,
+    "invoices": 40,
+    "payments": 20,
+    "pos_receipts": 20
+  },
+  "storefront": {
+    "parent_booked_acceptances": 50,
+    "dealer_booked_acceptances": 40,
+    "parent_cancelled_orders": 20
+  }
+}

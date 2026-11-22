@@ -29,6 +29,33 @@ def settings_from_file(path="silver_settings.json"):
     return {**SETTINGS, **(json.loads(path.read_text(encoding="utf-8-sig")) if path.is_file() else {})}
 
 
+def seed_config(settings_path, settings):
+    """Load the optional source seed configuration relative to Silver settings."""
+    location = settings.get("seed_config")
+    if not location:
+        return None
+    path = Path(settings_path).resolve().parent / location
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"Silver seed_config file not found: {path}") from exc
+
+
+def booking_batch_counts(model, config):
+    batch = config["batch_id"].strip().upper()
+    orders = model.table("sales_order").values()
+    result = []
+    for entity, prefix in (("parent", "P"), ("dealer", "D")):
+        found = sum(
+            row["legal_entity_id"] == entity
+            and str(row.get("order_reference") or "").startswith(f"{prefix}-{batch}-")
+            for row in orders
+        )
+        result.append({"batch": batch, "entity": entity,
+                       "expected": config[entity]["bookings"], "found": found})
+    return result
+
+
 def build(stage="validate", settings=None, bronze=None):
     """Rebuild up to the requested stage using inputs independently of notebook kernels."""
     cfg = {**SETTINGS, **(settings or {})}

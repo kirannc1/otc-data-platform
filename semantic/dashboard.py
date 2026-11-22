@@ -13,12 +13,6 @@ BUCKETS = ["Current", "1–30", "31–60", "61–90", "91+", "Unknown"]
 DASHBOARD_STYLE = """
 <style>
 [data-testid="stMainBlockContainer"] {max-width: 1360px; padding-top: 2.2rem;}
-[data-testid="stMetric"] {
-    border: 1px solid rgba(128, 145, 157, 0.26);
-    border-left: 3px solid #33856c;
-    border-radius: 0.7rem;
-    padding: 0.8rem 1rem;
-}
 </style>
 """
 
@@ -86,8 +80,11 @@ def integer(value):
 
 
 def kpis(*items):
-    for column, (label, value) in zip(st.columns(len(items)), items):
-        column.metric(label, value)
+    with st.container(horizontal=True):
+        for label, value in items:
+            with st.container(border=True, width=224, height="stretch", gap="xsmall"):
+                st.caption(label)
+                st.subheader(value, anchor=False)
 
 
 def heading(title, description):
@@ -107,7 +104,7 @@ def trend(data, unit, *, utc=False):
         return
     plot(alt.Chart(data).mark_line(point=True, strokeWidth=2.3).encode(
         x=alt.X("period:T", title="Period start" + (" (UTC)" if utc else ""), scale=alt.Scale(type="utc")),
-        y=alt.Y("value:Q", title=unit, axis=alt.Axis(format="~s")),
+        y=alt.Y("value:Q", title=unit, axis=alt.Axis(format=",~f", labelLimit=0, labelOverlap="greedy")),
         color=alt.Color("metric:N", title=None, scale=alt.Scale(range=PALETTE)),
         tooltip=[alt.Tooltip("period:T", title="Period start", format="%d %b %Y %H:%M" if utc else "%d %b %Y"),
                  alt.Tooltip("metric:N", title="Measure"), alt.Tooltip("value:Q", title=unit, format=",.2f")],
@@ -119,7 +116,7 @@ def horizontal(data, category="category", *, value="value", unit=None, series=Fa
         st.info("No observations match the selected filters.")
         return
     base = alt.Chart(data).mark_bar(cornerRadiusEnd=3).encode(
-        x=alt.X(f"{value}:Q", title=unit, axis=alt.Axis(format="~s"), stack=None),
+        x=alt.X(f"{value}:Q", title=unit, axis=alt.Axis(format=",~f", labelLimit=0, labelOverlap="greedy"), stack=None),
         y=alt.Y(f"{category}:N", title=None, sort=order),
         tooltip=[alt.Tooltip(f"{category}:N", title="Group"), alt.Tooltip(f"{value}:Q", title=unit, format=",.2f")],
     )

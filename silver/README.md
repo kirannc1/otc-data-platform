@@ -84,6 +84,15 @@ expects one committed manifest for each Finance feed and the MDM fixture
 unless you pin a choice. Review the selected manifest table at the start of
 each Silver notebook.
 
+For a configurable seed, set `seed_config` in `silver_settings.json` to the
+JSON file used for that run. For example, use
+`"seed_config": "../source-setup/seed/seed-volume.json"` when that file is
+in the same project. The path is relative to `silver_settings.json`.
+Notebook 03 in batch mode derives the batch ID, expected counts, and default
+dealer export name from the seed config. Notebook 10 checks the same booking
+counts before publication. Refresh the Bronze manifest pins when switching
+batches. A null `seed_config` lets notebook 10 build without the seed checks.
+
 For repeatable runs or to select among multiple manifests, copy the template
 from the `silver/` folder. Skip the copy if you already have a settings file.
 

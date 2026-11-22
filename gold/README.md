@@ -46,6 +46,8 @@ if (-not (Test-Path .\gold_settings.json)) {
 code .
 ```
 
+The Gold notebooks read `gold_settings.json` beside `gold_pipeline.py` and print the resolved settings path and configured Silver manifest. If settings change after a build, rerun the build cell before publishing.
+
 Open `gold_settings.json` and set `silver_manifest` to the exact **URI printed
 by notebook 10**. The new Delta format gets a new release ID. Repoint Gold to
 the new URI after publishing. Gold also accepts previous format-1 manifests

@@ -1,6 +1,6 @@
 # OTC Silver notebooks
 
-These notebooks extend the Bronze discovery notebooks with canonical Silver tables, effective-dated demo mappings, traceable finance controls, and an optional local snapshot. Each notebook opens directly against committed Bronze inputs. It runs the prior steps in its own kernel so there are no cross-notebook state dependencies.
+These notebooks extend the Bronze discovery notebooks with canonical Silver tables, effective-dated demo mappings, traceable finance controls, and an optional MinIO snapshot. Each notebook opens directly against committed Bronze inputs. It runs the prior steps in its own kernel so there are no cross-notebook state dependencies.
 
 ## Run in VS Code on Windows
 
@@ -22,7 +22,7 @@ The included helper uses the existing `ingestion-airflow/platform.env` for Bronz
 | `07_silver_fulfillment_inventory.ipynb` | Dispatches, return lines and Stock Entry movement legs |
 | `08_silver_finance.ipynb` | Billing, credits, payment allocations, GL and source AR snapshots |
 | `09_silver_channels_bank_budget.ipynb` | Logical events and deliveries, POS, bank match candidates and budget amounts |
-| `10_silver_reconcile_publish.ipynb` | Complete build, reconciliation and exception reports, plus optional local JSONL snapshot |
+| `10_silver_reconcile_publish.ipynb` | Complete build, reconciliation and exception reports, plus optional MinIO Delta release |
 
 Run 05–10 in order for a walkthrough. Run only 10 when you want the complete build and validation. Notebook 04 remains the two-order design example.
 
@@ -50,4 +50,9 @@ Pending candidates remain pending by default. To exercise a steward decision, se
 
 ## Publish the Silver review output
 
-Notebook 10 defaults to preview. Set `PUBLISH_LOCAL = True` to write under `silver_output/`. Each snapshot includes table JSONL, a checksum manifest, observations, control results, and exceptions. Failed numerical controls and error-level exceptions block publication. Review and not-covered statuses remain visible in the output. Monetary decimals are serialized as strings. The format supports immutable review snapshots and exact reruns. It does not implement a production Silver table store or an SCD history model.
+Notebook 10 defaults to preview. Set `PUBLISH_TARGET = "minio"` to publish a
+validated Delta release to `otc-silver`. Gold reads the exact manifest URI
+printed by the notebook. Each non-empty table contains Parquet data and its
+Delta transaction log. The release manifest records the table paths, Delta
+versions, review statuses, and logical checksums. Set
+`PUBLISH_TARGET = "local"` for a legacy JSONL export.

@@ -1,13 +1,14 @@
 """Entrypoints shared by the independent Silver notebooks."""
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import shutil
 from tempfile import mkdtemp
 
 import pandas as pd
 
-from bronze_review import open_bronze
+from bronze_review import open_bronze, s3_client
 from silver_controls import reconcile
 from silver_inputs import load_inputs
 from silver_model import (Model, apply_mdm, normalize_channels, normalize_finance, normalize_fulfillment,
@@ -59,8 +60,8 @@ def input_frame(model):
     ])
 
 
-def publish(model, root="silver_output"):
-    """Create an immutable local snapshot. Decimal values are written as JSON strings."""
+def release_payload(model):
+    """Serialize a validated release identically for local and object storage."""
     if model.stage != "validate":
         raise ValueError("Run all stages and controls before publishing")
     if any(check["status"] == "FAIL" for check in model.controls) or any(
@@ -82,6 +83,12 @@ def publish(model, root="silver_output"):
                   "coverage": model.coverage, "files": files}
     run_id = sha256(encode(provenance)).hexdigest()
     manifest = encode({"model_run_id": run_id, **provenance})
+    return run_id, payloads, files, manifest
+
+
+def publish(model, root="silver_output"):
+    """Create an immutable local snapshot."""
+    run_id, payloads, files, manifest = release_payload(model)
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     target = root / run_id
@@ -109,3 +116,63 @@ def publish(model, root="silver_output"):
         if staging.exists():
             shutil.rmtree(staging)
     return target
+
+
+
+def publish_to_minio(model, bucket="otc-silver", *, client=None, storage_options=None):
+    """Commit typed Silver Delta tables, then publish the release manifest."""
+    from botocore.exceptions import ClientError
+
+    from silver_delta import build_delta_payload, write_delta_tables
+
+    _, payloads, _, provenance = release_payload(model)
+    run_id, tables, specs, manifest = build_delta_payload(json.loads(provenance), payloads)
+    if client is None or storage_options is None:
+        from dotenv import dotenv_values
+
+        env_file = Path(__file__).resolve().parent.parent / "ingestion-airflow" / "platform.env"
+        env = dotenv_values(env_file, interpolate=False, encoding="utf-8-sig") if env_file.exists() else {}
+        endpoint = os.environ.get("SILVER_S3_ENDPOINT", "http://127.0.0.1:19000")
+        access = os.environ.get("SILVER_S3_ACCESS_KEY") or os.environ.get("BRONZE_S3_ACCESS_KEY") or env.get("BRONZE_S3_ACCESS_KEY")
+        secret = os.environ.get("SILVER_S3_SECRET_KEY") or os.environ.get("BRONZE_S3_SECRET_KEY") or env.get("BRONZE_S3_SECRET_KEY")
+        if not access or not secret:
+            raise ValueError("Set SILVER_S3_ACCESS_KEY and SILVER_S3_SECRET_KEY or configure the local platform.env")
+        if client is None:
+            client = s3_client(endpoint, access, secret)
+        if storage_options is None:
+            storage_options = {
+                "AWS_ENDPOINT_URL": endpoint,
+                "AWS_ACCESS_KEY_ID": access,
+                "AWS_SECRET_ACCESS_KEY": secret,
+                "AWS_REGION": "us-east-1",
+                "allow_http": str(endpoint.startswith("http://")).lower(),
+                "aws_virtual_hosted_style_request": "false",
+                "aws_conditional_put": "etag",
+            }
+    try:
+        client.head_bucket(Bucket=bucket)
+    except ClientError as exc:
+        if exc.response["ResponseMetadata"]["HTTPStatusCode"] != 404:
+            raise
+        try:
+            client.create_bucket(Bucket=bucket)
+        except ClientError as create_error:
+            if create_error.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
+                raise
+
+    prefix = f"releases/{run_id}"
+    release_uri = f"s3://{bucket}/{prefix}"
+    write_delta_tables(release_uri, tables, specs, storage_options)
+
+    object_key = f"{prefix}/manifest.json"
+    try:
+        client.put_object(Bucket=bucket, Key=object_key, Body=manifest,
+                          ContentType="application/json", IfNoneMatch="*")
+    except ClientError as exc:
+        if exc.response["ResponseMetadata"]["HTTPStatusCode"] not in {409, 412}:
+            raise
+        response = client.get_object(Bucket=bucket, Key=object_key)
+        with response["Body"] as body:
+            if body.read() != manifest:
+                raise ValueError(f"Existing Silver manifest differs: {release_uri}/manifest.json") from exc
+    return f"{release_uri}/manifest.json"

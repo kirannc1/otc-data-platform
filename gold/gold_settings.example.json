@@ -1,0 +1,10 @@
+{
+  "silver_manifest": "",
+  "output_root": "gold_output",
+  "allow_blank_dealer_booking_status": true,
+  "check_baseline": true,
+  "history_complete": false,
+  "calendar_month_is_fiscal_period": false,
+  "channel_by_entity": {},
+  "gold_bucket": "otc-gold"
+}

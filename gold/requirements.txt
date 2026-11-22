@@ -1,0 +1,8 @@
+pandas>=2.2,<3
+notebook>=7,<8
+boto3>=1.36,<2
+python-dotenv>=1,<2
+
+# Typed Silver and Gold Delta tables
+deltalake>=1.6,<2
+pyarrow>=17,<25

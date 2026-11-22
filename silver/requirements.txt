@@ -2,10 +2,14 @@
 notebook>=7,<8
 
 # S3 client for reading the Bronze bucket
-boto3>=1,<2
+boto3>=1.36,<2
 
 # Read the existing Compose credentials from platform.env
 python-dotenv>=1,<2
 
 # Render Bronze records and mapping previews as notebook tables
 pandas>=2.2,<3
+
+# Typed Silver Delta tables
+deltalake>=1.6,<2
+pyarrow>=17,<25
